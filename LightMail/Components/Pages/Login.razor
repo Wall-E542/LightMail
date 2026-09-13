@@ -1,0 +1,156 @@
+﻿@page "/login"
+@using LightMail.Components.Dialog
+@using LightMail.Services
+
+
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height:100vh;">
+
+    <MudPaper Elevation="8" Class="pa-8 rounded-xl" Style="width:420px;">
+
+        <MudStack Spacing="3">
+
+            <MudText Typo="Typo.h4" Align="Align.Center">
+                Konto auswählen
+            </MudText>
+
+
+            @if (_accounts != null && _accounts.Any())
+            {
+                <MudText Typo="Typo.subtitle2">
+                    Vorhandene Konten
+                </MudText>
+
+
+                @foreach (var account in _accounts)
+                {
+                    <MudPaper Elevation="1" Class="pa-2 mb-2">
+
+                        <MudStack Row="true"
+                                  AlignItems="AlignItems.Center"
+                                  Spacing="2">
+
+                            <MudButton Variant="Variant.Text"
+                                       Style="flex:1;justify-content:flex-start;"
+                                       OnClick="() => SelectAccount(account)">
+
+                                <MudAvatar Color="Color.Primary"
+                                           Size="Size.Medium"
+                                           Class="mr-3">
+                                    @account.Initials
+                                </MudAvatar>
+
+                                <MudStack Spacing="0"
+                                          Style="text-align:left;">
+
+                                    <MudText Typo="Typo.body2">
+                                        @account.Name
+                                    </MudText>
+
+                                    <MudText Typo="Typo.caption"
+                                             Color="Color.Secondary">
+                                        @account.Email
+                                    </MudText>
+
+                                </MudStack>
+
+                            </MudButton>
+
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           OnClick="() => RemoveAccount(account)" />
+
+                        </MudStack>
+
+                    </MudPaper>
+                }
+            }
+
+
+            <MudDivider Class="my-3"/>
+
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddAccountDialog">
+                Neues Konto hinzufügen
+            </MudButton>
+
+
+        </MudStack>
+
+    </MudPaper>
+
+</MudContainer>
+
+@inject IDialogService DialogService
+@inject MailService MailService
+@inject NavigationManager Nav
+@inject AccountStorageService AccountStorage
+@inject ISnackbar Snackbar
+@code {
+
+    protected override async Task OnInitializedAsync()
+    {
+        _accounts = await AccountStorage.LoadAccountsAsync();
+    }
+    
+    private List<MailAccount>? _accounts;
+
+    private async Task OpenAddAccountDialog()
+    {
+        var dialog = await DialogService.ShowAsync<AddAccountDialog>(
+            "Neues Konto hinzufügen"
+        );
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is MailAccount account)
+        {
+            _accounts.Add(account);
+            await AccountStorage.SaveAccountsAsync(_accounts);
+            StateHasChanged();
+            await SelectAccount(account);
+        }
+    }
+    
+    private async Task RemoveAccount(MailAccount account)
+    {
+        _accounts?.Remove(account);
+
+        await AccountStorage.SaveAccountsAsync(_accounts ?? new());
+
+        if (MailService.CurrentAccount?.Email == account.Email)
+        {
+            await AccountStorage.ClearLastAccountAsync();
+            MailService.ClearLastAccount();
+        }
+
+        StateHasChanged();
+    }
+    
+    private async Task SelectAccount(MailAccount account)
+    {
+        if (MailService.CurrentAccount?.Email == account.Email)
+        {
+            Nav.NavigateTo("/posteingang");
+            return;
+        }
+        
+        bool success = await MailService.LoginAsync(account);
+
+        if(success)
+        {
+            await AccountStorage.SaveLastAccountAsync(account);
+            Snackbar.Add("Erfolgreich angemeldet!", Severity.Success);
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            Snackbar.Add("Anmeldung fehlgeschlagen! Überprüfe deine angaben", Severity.Error);
+        }
+    }
+}

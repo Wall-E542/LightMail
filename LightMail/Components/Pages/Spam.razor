@@ -1,0 +1,338 @@
+﻿@page "/Spam"
+@using LightMail.Services
+
+@inject MailService MailService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3">
+
+    <!-- Header -->
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+
+        <MudText Typo="Typo.h4">
+            Spam E-Mails
+        </MudText>
+
+        <MudSpacer />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       OnClick="Refresh"/>
+
+    </MudStack>
+
+    
+    
+    <!-- Account Info -->
+    @if (MailService.CurrentAccount != null)
+    {
+
+        <MudText Typo="Typo.caption"
+                 Color="Color.Secondary">
+
+            Verbunden mit:
+            @MailService.CurrentAccount.Email
+
+        </MudText>
+        
+        
+        <MudStack Row="true"
+                  AlignItems="AlignItems.Center">
+
+
+            <MudCheckBox T="bool"
+                         Value="@AllSelected"
+                         ValueChanged="SelectAll"/>
+
+
+
+            <MudIconButton Icon="@Icons.Material.Filled.DeleteForever"
+                           Color="Color.Error"
+                           OnClick="DeleteSelected"/>
+
+        </MudStack>
+
+    }
+
+    <MudPaper Elevation="2" Class="rounded-xl">
+        
+        @if (MailService.CurrentAccount == null)
+        {
+
+            <MudStack Class="pa-8"
+                      AlignItems="AlignItems.Center"
+                      Spacing="2">
+
+
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle"
+                         Size="Size.Large"/>
+
+
+                <MudText Typo="Typo.h6">
+                    Kein Konto verbunden
+                </MudText>
+
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Href="/login"
+                           StartIcon="@Icons.Material.Filled.Login">
+
+                    Zum Login
+
+                </MudButton>
+
+
+            </MudStack>
+
+        }
+        
+        @if (_emails.Count == 0)
+        {
+            <MudStack Class="pa-8"
+                      AlignItems="AlignItems.Center"
+                      Spacing="2">
+
+                <MudText>
+                    Keine markierten E-Mails
+                </MudText>
+
+            </MudStack>
+        }
+        else
+        {
+            @foreach(var mail in _emails)
+            {
+                <MudPaper Class="pa-2">
+
+                    <MudStack Row="true"
+                              AlignItems="AlignItems.Center">
+                        <MudCheckBox T="bool"
+                                     Value="@SelectedMails.Contains(mail)"
+                                     ValueChanged="@(x => ToggleSelection(mail, x))"
+                                     @onmousedown:stopPropagation="true"/>
+
+                        <MudButton FullWidth="true"
+                                   Class="mail-item"
+                                   Style="@GetMailStyle(mail)"
+                                   OnClick="() => OpenMail(mail)">
+
+
+                            <MudStack Row="true"
+                                      Style="width:100%"
+                                      AlignItems="AlignItems.Center">
+
+
+                                <MudAvatar Color="@(mail.IsRead ? Color.Default : Color.Primary)">
+                                    @mail.Initials
+                                </MudAvatar>
+
+
+                                <MudStack Spacing="0"
+                                          Style="flex:1;text-align:left"
+                                          Class="ml-3">
+
+                                    <MudText Typo="@(mail.IsRead ? Typo.body1 : Typo.subtitle1)"
+                                             Style="@(mail.IsRead ? "" : "font-weight:700;")">
+
+                                        @mail.Subject
+
+                                    </MudText>
+
+
+                                    <MudText Typo="Typo.caption"
+                                             Color="Color.Secondary">
+
+                                        @mail.Sender
+
+                                    </MudText>
+
+                                </MudStack>
+
+
+                                <MudText Typo="Typo.caption">
+                                    @mail.Date.ToShortDateString()
+                                </MudText>
+
+
+                            </MudStack>
+
+
+                        </MudButton>
+
+
+
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       OnClick="() => DeleteMail(mail)" />
+
+
+                    </MudStack>
+
+                </MudPaper>
+
+                <MudDivider/>
+            }
+        }
+
+    </MudPaper>
+
+</MudStack>
+
+<MudMessageBox @ref="_mudMessageBox" Title="Warnung" CancelText="Abbrechen">
+    <MessageContent>
+        Möchtest du die Mails in den Papierkorb verschieben?
+    </MessageContent>
+    <YesButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever">Verschieben</MudButton>
+    </YesButton>
+</MudMessageBox>
+@implements IDisposable
+@code {
+    
+    public void SearchChanged()
+    {
+        string search = MailService.searchTerm?.Trim().ToLower() ?? "";
+
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            _emails = _emails
+                .OrderByDescending(x => x.Date)
+                .ToList();
+
+            InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _emails = _emails
+            .OrderBy(x =>
+            {
+                string subject = x.Subject?.ToLower() ?? "";
+                string sender = x.Sender?.ToLower() ?? "";
+
+                if (subject == search) return 0;
+                if (subject.StartsWith(search)) return 1;
+                if (subject.Contains(search)) return 2;
+
+                if (sender.StartsWith(search)) return 3;
+                if (sender.Contains(search)) return 4;
+
+                return 5;
+            })
+            .ThenByDescending(x => x.Date)
+            .ToList();
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    private List<Posteingang.EmailPreview> _emails = new();
+
+    public async void Refresh()
+    {
+        await LoadEmails();
+        StateHasChanged();
+        Snackbar.Add(
+            "Emails wurden aktualisiert!",
+            Severity.Success);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            MailService.SearchChanged += SearchChanged;
+            await LoadEmails();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    public void Dispose()
+    {
+        MailService.SearchChanged -= SearchChanged;
+    }
+    
+    private async Task LoadEmails()
+    {
+        _emails = await MailService.GetSpamAsync();
+
+        _emails = _emails
+            .OrderByDescending(x => x.Date)
+            .ToList();
+    }
+
+    private string GetMailStyle(Posteingang.EmailPreview mail)
+    {
+        return mail.IsRead
+            ? ""
+            : "background-color:rgba(33,150,243,0.08);";
+    }
+    
+    private void OpenMail(Posteingang.EmailPreview mail)
+    {
+        Navigation.NavigateTo($"/mail/{mail.Folder}/{mail.Id}");
+    }
+
+    private async Task DeleteMail(Posteingang.EmailPreview mail)
+    {
+        await MailService.MoveToTrashAsync(mail);
+
+        await LoadEmails();
+
+        Snackbar.Add(
+            "E-Mail wurde verschoben",
+            Severity.Success);
+        StateHasChanged();
+    }
+    
+    private HashSet<Posteingang.EmailPreview> SelectedMails = new();
+    private MudMessageBox _mudMessageBox;
+    private async void DeleteSelected()
+    {
+        bool? result = await _mudMessageBox.ShowAsync();
+        if (result == true)
+        {
+            int num = SelectedMails.Count;
+            await MailService.MoveToTrashAsync(SelectedMails.ToList());
+            SelectedMails.Clear();
+            await LoadEmails();
+            StateHasChanged();
+            Snackbar.Add(
+                $"{num} E-Mail{(num > 1 ? "s" : "")} wurde{(num > 1 ? "n" : "")} in den Papierkorb verschoben",
+                Severity.Success);
+        }
+    }
+    
+    private bool AllSelected =>
+        _emails.Count > 0 &&
+        SelectedMails.Count == _emails.Count;
+    
+    private void ToggleSelection(
+        Posteingang.EmailPreview mail,
+        bool selected)
+    {
+        if(selected)
+            SelectedMails.Add(mail);
+        else
+            SelectedMails.Remove(mail);
+    }
+    
+    private void SelectAll(bool selected)
+    {
+        if(selected)
+        {
+            foreach(var mail in _emails)
+            {
+                SelectedMails.Add(mail);
+            }
+        }
+        else
+        {
+            SelectedMails.Clear();
+        }
+    }
+
+}

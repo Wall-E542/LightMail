@@ -1,0 +1,111 @@
+﻿@inherits LayoutComponentBase
+@using LightMail.Services
+@using MailApp.Theme
+
+<MudThemeProvider Theme="AppTheme.Dark" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+<MudLayout>
+
+    <MudAppBar Elevation="0" Fixed="true" Class="mud-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="@ToggleDrawer" />
+
+        <MudText Typo="Typo.h6" Class="ml-3 mr-6">
+            Mail
+        </MudText>
+
+        <MudSpacer />
+
+        <MudTextField T="string"
+                      Value="_searchTerm"
+                      ValueChanged="OnSearchChanged"
+                      Placeholder="E-Mails durchsuchen"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Variant="Variant.Filled"
+                      Margin="Margin.Dense"
+                      Style="max-width:420px;" />
+
+        <MudSpacer />
+
+        <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                       Color="Color.Inherit"
+                       Href="/einstellungen" />
+
+        <MudIconButton Icon="@Icons.Material.Filled.AccountCircle"
+                       Color="Color.Inherit"
+                       Href="/login"
+                       Class="ml-2" />
+
+    </MudAppBar>
+    
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="0" Variant="DrawerVariant.Persistent">
+        <MudNavMenu Class="pa-3">
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.Edit" Class="mb-4" href="/compose">
+                Neue E-Mail
+            </MudButton>
+
+            <MudNavLink Href="/posteingang" Icon="@Icons.Material.Filled.Inbox" Match="NavLinkMatch.Prefix">
+                Posteingang
+                @if (MailService.UnReadAmount > 0)
+                {
+                    <MudBadge Content="@MailService.UnReadAmount"
+                              Color="Color.Primary"
+                              Overlap="true"
+                              Class="ml-2" />
+                }
+            </MudNavLink>
+            <MudNavLink Href="/markiert" Icon="@Icons.Material.Filled.Star">Markiert</MudNavLink>
+            <MudNavLink Href="/gesendet" Icon="@Icons.Material.Filled.Send">Gesendet</MudNavLink>
+            <MudNavLink Href="/entwuerfe" Icon="@Icons.Material.Filled.Drafts">
+                Entwürfe
+            </MudNavLink>
+            @if (MailService.ArchiveFolder != null)
+            {
+                <MudNavLink Href="/archiv" Icon="@Icons.Material.Filled.Archive">Archiv</MudNavLink>
+            }
+            <MudNavLink Href="/spam" Icon="@Icons.Material.Filled.Report">Spam</MudNavLink>
+            <MudNavLink Href="/papierkorb" Icon="@Icons.Material.Filled.Delete">Papierkorb</MudNavLink>
+
+            <MudDivider Class="my-3" />
+            
+            <MudNavLink Href="/einstellungen" Icon="@Icons.Material.Filled.Settings">Einstellungen</MudNavLink>
+
+        </MudNavMenu>
+    </MudDrawer>
+    
+    <MudMainContent>
+        <div class="pa-4">
+            @Body
+        </div>
+    </MudMainContent>
+    
+</MudLayout>
+
+@inject MailService MailService
+
+@code {
+    private bool _drawerOpen = true;
+    private string? _searchTerm;
+
+    private void OnSearchChanged(string value)
+    {
+        _searchTerm = value;
+        MailService.SearchTermChanged(value);
+    }
+    
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        MailService.AccountChanged += StateHasChanged;
+    }
+    
+}
+

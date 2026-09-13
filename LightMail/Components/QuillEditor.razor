@@ -1,0 +1,58 @@
+﻿@inject IJSRuntime JS
+
+<div id="@Id"
+     style="height:400px;">
+</div>
+
+@code {
+
+    private string Id = "quill_" + Guid.NewGuid();
+    
+    [Parameter]
+    public string Value { get; set; } = "";
+    
+    private bool initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync(
+                "quillEditor.init",
+                Id,
+                Value ?? "");
+
+            initialized = true;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (initialized)
+        {
+            await JS.InvokeVoidAsync(
+                "quillEditor.setContent",
+                Id,
+                Value);
+        }
+    }
+    
+    public async Task SetValue(string value)
+    {
+        if (!initialized)
+            return;
+
+
+        await JS.InvokeVoidAsync(
+            "quillEditor.setContent",
+            Id,
+            value ?? "");
+    }
+    
+    public async Task<string> GetValue()
+    {
+        return await JS.InvokeAsync<string>(
+            "quillEditor.getContent",
+            Id);
+    }
+}

@@ -1,0 +1,602 @@
+﻿@page "/compose"
+@page "/compose/{Folder}/{Mode}/{Id}"
+@using LightMail.Services
+@using MimeKit
+@using MailKit
+@inject LightMail.Services.MailService MailService
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+
+<MudPaper Class="pa-6 rounded-xl">
+
+    <MudStack Spacing="3">
+
+        <!-- Header -->
+        <MudStack Row="true" AlignItems="MudBlazor.AlignItems.Center">
+
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                           OnClick="Return" />
+
+            <MudText Typo="Typo.h4">
+                Neue Nachricht
+            </MudText>
+
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       OnClick="SaveDraft">
+
+                Speichern
+
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Send"
+                       OnClick="SendMail">
+
+                Senden
+
+            </MudButton>
+
+        </MudStack>
+
+        <MudDivider />
+
+        <!-- Empfänger -->
+
+        <MudTextField @bind-Value="_mail.To"
+                      Label="An"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Person" />
+
+        <MudTextField @bind-Value="_mail.Cc"
+                      Label="Cc"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.People" />
+
+        <MudTextField @bind-Value="_mail.Bcc"
+                      Label="Bcc"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.VisibilityOff" />
+
+        <MudTextField @bind-Value="_mail.Subject"
+                      Label="Betreff"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Title" />
+        <!-- Nachricht -->
+        <MudPaper Class="pa-2" Elevation="0">
+
+            <MudText Typo="Typo.subtitle2" Class="mb-2">
+                Nachricht
+            </MudText>
+
+
+            <QuillEditor @ref="_editor"
+                         Value="@_mail.Body" />
+
+
+            @if (!string.IsNullOrEmpty(_mail.QuotedBody))
+            {
+                <MudDivider Class="my-4"/>
+
+
+                <MudPaper Class="pa-4"
+                          Elevation="0"
+                          Style="opacity:0.75">
+
+
+                    <MudText Typo="Typo.caption">
+                        Ursprüngliche Nachricht
+                    </MudText>
+
+
+                    <div>
+                        @((MarkupString)_mail.QuotedBody)
+                    </div>
+
+
+                </MudPaper>
+            }
+          
+        </MudPaper>
+        <!-- Anhänge -->
+        <MudPaper Class="pa-4" Elevation="0">
+
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+
+                <MudText Typo="Typo.h6">
+                    Anhänge
+                </MudText>
+                <MudSpacer />
+                <MudFileUpload  T="IReadOnlyList<IBrowserFile>" FilesChanged="UploadFiles">
+                    <CustomContent>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="@context.OpenFilePickerAsync"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload">
+                            Datei hochladen
+                        </MudButton>
+                    </CustomContent>
+                    <SelectedTemplate />
+                </MudFileUpload>
+            </MudStack>
+
+
+            @if (_mail.Attachments.Any())
+            {
+                <MudGrid Class="mt-3">
+
+                    @foreach (var attachment in _mail.Attachments)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+
+                            <MudPaper Class="pa-3">
+
+                                <MudStack Row="true"
+                                          AlignItems="AlignItems.Center">
+
+                                    <MudIcon Icon="@Icons.Material.Filled.AttachFile"
+                                             Color="Color.Primary"/>
+
+
+                                    <MudStack Spacing="0">
+
+                                        <MudText>
+                                            @attachment.FileName
+                                        </MudText>
+
+
+                                        <MudText Typo="Typo.caption">
+                                            @FormatSize(attachment.Size)
+                                        </MudText>
+
+                                    </MudStack>
+
+
+                                    <MudSpacer/>
+
+
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => RemoveAttachment(attachment))"/>
+
+                                </MudStack>
+
+                            </MudPaper>
+
+                        </MudItem>
+                    }
+
+                </MudGrid>
+            }
+
+        </MudPaper>
+
+    </MudStack>
+
+</MudPaper>
+
+@code{
+
+    private QuillEditor? _editor;
+    [Parameter] public string? Mode { get; set; }
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? Folder { get; set; }
+
+    public class ComposeMailModel
+    {
+        public string To { get; set; } = "";
+        public string Cc { get; set; } = "";
+        public string Bcc { get; set; } = "";
+
+        public string Subject { get; set; } = "";
+
+        public string Body { get; set; } = "";
+
+        public string QuotedBody { get; set; } = "";
+
+        public List<EmailAttachment> Attachments { get; set; } = new();
+    }
+
+    private ComposeMailModel _mail = new();
+
+    private bool _editorInitialized;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Mode == null)
+            return;
+
+        if (!uint.TryParse(Id, out var uidValue))
+            return;
+
+        var uniqueId = new MailKit.UniqueId(uidValue);
+
+        var original = await MailService.GetMailAsync(Folder, uniqueId);
+
+
+        if (original == null)
+            return;
+
+
+        switch (Mode.ToLower())
+        {
+            case "reply":
+
+                _mail.To = original.Sender;
+
+                _mail.Subject =
+                    "Re: " + original.Subject;
+
+
+                _mail.Body = "";
+
+                _mail.QuotedBody =
+                    BuildReplyBody(original);
+
+                break;
+
+
+
+            case "replyall":
+
+                _mail.To = original.Sender;
+
+
+                var allRecipients = original.Recipients
+                    .Where(x =>
+                        !x.Contains(
+                            MailService.CurrentAccount!.Email,
+                            StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+
+                _mail.Cc =
+                    string.Join("; ", allRecipients);
+
+
+                _mail.Subject =
+                    "Re: " + original.Subject;
+
+
+                _mail.Body = "";
+
+                _mail.QuotedBody =
+                    BuildReplyBody(original);
+
+                break;
+
+
+
+            case "forward":
+
+                _mail.Subject =
+                    "WG: " + original.Subject;
+
+
+                _mail.Body =
+                    BuildForwardEditorBody(original);
+
+
+                _mail.Attachments =
+                    original.Attachments.ToList();
+
+                break;
+        }
+    }
+
+    private string BuildForwardEditorBody(EmailMessage mail)
+    {
+        return $"""
+
+                <p></p>
+
+                <hr>
+
+                <p>
+                <b>Weitergeleitete Nachricht</b>
+                </p>
+
+
+                <p>
+                <b>Von:</b> {mail.Sender}
+
+                <br>
+
+                <b>Datum:</b> {mail.Date:dd.MM.yyyy HH:mm}
+
+                <br>
+
+                <b>Betreff:</b> {mail.Subject}
+
+                </p>
+
+
+                <blockquote style="
+                    border-left:3px solid #888;
+                    padding-left:15px;
+                    color:#777;">
+
+                    {mail.Body}
+
+                </blockquote>
+
+                """;
+    }
+
+    private string BuildReplyBody(EmailMessage mail)
+    {
+        var original = mail.IsHtml
+            ? mail.Body
+            : mail.PlainBody.Replace("\n", "<br>");
+
+
+        return $"""
+
+                <br><br>
+
+                <hr>
+
+                <p>
+                Am {mail.Date:dd.MM.yyyy HH:mm}
+                schrieb <b>{mail.Sender}</b>:
+                </p>
+
+
+                <blockquote style="
+                border-left:3px solid #888;
+                padding-left:15px;
+                color:#777;">
+
+                {original}
+
+                </blockquote>
+
+                """;
+    }
+
+
+    private async Task UploadFiles(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles())
+        {
+            using var stream = file.OpenReadStream(50 * 1024 * 1024);
+
+            using var ms = new MemoryStream();
+
+            await stream.CopyToAsync(ms);
+
+            _mail.Attachments.Add(new EmailAttachment
+            {
+                FileName = file.Name,
+                ContentType = file.ContentType,
+                Size = file.Size,
+                Data = ms.ToArray()
+            });
+        }
+    }
+
+    private void RemoveAttachment(EmailAttachment attachment)
+    {
+        _mail.Attachments.Remove(attachment);
+    }
+
+    private string FormatSize(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+
+        double size = bytes;
+
+        int unit = 0;
+
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+
+        return $"{size:0.##} {units[unit]}";
+    }
+
+    private async Task SendMail()
+    {
+        var editorContent = await _editor!.GetValue();
+
+
+        if (string.IsNullOrEmpty(_mail.QuotedBody))
+        {
+            _mail.Body = editorContent;
+        }
+        else
+        {
+            _mail.Body =
+                editorContent +
+                "<br><br>" +
+                _mail.QuotedBody;
+        }
+
+
+        var mail = CreateMimeMessage();
+
+
+        await MailService.SendMailAsync(mail);
+
+
+
+        Snackbar.Add(
+            "E-Mail gesendet",
+            Severity.Success);
+
+
+        Nav.NavigateTo("/posteingang");
+    }
+
+    public bool IsEmptyMail()
+    {
+        if (!string.IsNullOrEmpty(_mail.QuotedBody))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_mail.Body))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_mail.To))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_mail.Bcc))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_mail.Cc))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(_mail.Subject))
+        {
+            return false;
+        }
+
+        if (_mail.Attachments.Count > 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public async void Return()
+    {
+        if (!IsEmptyMail())
+        {
+            await SaveDraft();
+        }
+
+        Nav.NavigateTo("/posteingang");
+    }
+
+    private async Task UploadFiles(IReadOnlyList<IBrowserFile> files)
+    {
+        foreach (var file in files)
+        {
+            using var stream = file.OpenReadStream(50 * 1024 * 1024);
+
+            using var ms = new MemoryStream();
+
+            await stream.CopyToAsync(ms);
+
+            _mail.Attachments.Add(new EmailAttachment
+            {
+                FileName = file.Name,
+                ContentType = file.ContentType,
+                Size = file.Size,
+                Data = ms.ToArray()
+            });
+        }
+    }
+
+    private async Task SaveDraft()
+    {
+        var editorContent = await _editor!.GetValue();
+
+        _mail.Body = editorContent;
+
+
+        var mail = CreateMimeMessage();
+
+
+        await MailService.SaveDraftAsync(mail);
+
+
+        Snackbar.Add(
+            "Entwurf gespeichert",
+            Severity.Success);
+    }
+
+    private MimeKit.MimeMessage CreateMimeMessage()
+    {
+        var mail = new MimeMessage();
+
+
+        mail.From.Add(
+            MailboxAddress.Parse(
+                MailService.CurrentAccount!.Email));
+
+
+
+        foreach (var recipient in _mail.To.Split(';'))
+        {
+            if (!string.IsNullOrWhiteSpace(recipient))
+            {
+                mail.To.Add(
+                    MailboxAddress.Parse(
+                        recipient.Trim()));
+            }
+        }
+
+
+
+        foreach (var recipient in _mail.Cc.Split(';'))
+        {
+            if (!string.IsNullOrWhiteSpace(recipient))
+            {
+                mail.Cc.Add(
+                    MailboxAddress.Parse(
+                        recipient.Trim()));
+            }
+        }
+
+
+
+        foreach (var recipient in _mail.Bcc.Split(';'))
+        {
+            if (!string.IsNullOrWhiteSpace(recipient))
+            {
+                mail.Bcc.Add(
+                    MailboxAddress.Parse(
+                        recipient.Trim()));
+            }
+        }
+
+
+
+        mail.Subject = _mail.Subject;
+
+
+
+        var builder = new BodyBuilder
+        {
+            HtmlBody = _mail.Body
+        };
+
+
+
+        foreach (var attachment in _mail.Attachments)
+        {
+            builder.Attachments.Add(
+                attachment.FileName,
+                attachment.Data,
+                ContentType.Parse(
+                    attachment.ContentType));
+        }
+
+
+
+        mail.Body = builder.ToMessageBody();
+
+
+        return mail;
+    }
+    }

@@ -1,0 +1,74 @@
+﻿<MudDialog>
+
+    <DialogContent>
+
+        <MudStack Spacing="3">
+            
+            
+            
+            <MudTextField @bind-Value="_account.Name"
+                          Label="Name"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Badge" />
+            
+            <MudTextField @bind-Value="_account.Email"
+                          Label="E-Mail-Adresse"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Email"/>
+
+
+            <MudTextField @bind-Value="_account.Password"
+                          Label="Passwort"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Lock"/>
+
+        </MudStack>
+
+    </DialogContent>
+
+
+    <DialogActions>
+
+        <MudButton OnClick="Cancel">
+            Abbrechen
+        </MudButton>
+
+
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Add">
+            Hinzufügen
+        </MudButton>
+
+    </DialogActions>
+
+</MudDialog>
+
+
+@code {
+
+    [CascadingParameter]
+    IMudDialogInstance MudDialog { get; set; } = null!;
+
+
+    private MailAccount _account = new();
+
+
+    private void Add()
+    {
+        MudDialog.Close(
+            DialogResult.Ok(_account)
+        );
+    }
+
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+}

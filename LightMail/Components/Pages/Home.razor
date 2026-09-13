@@ -1,0 +1,65 @@
+﻿@page "/home"
+<!--DEPRECATED -->
+<MudGrid Spacing="3" Class="mb-6">
+    @foreach (var stat in _stats)
+    {
+        <MudItem xs="6" sm="3">
+            <MudPaper Class="pa-4" Elevation="0" Style="border-radius:12px;">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">@stat.Label</MudText>
+                <MudText Typo="Typo.h4">@stat.Value</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudText Typo="Typo.subtitle1" Class="mb-3">Ordner</MudText>
+
+<MudGrid Spacing="3">
+    @foreach (var folder in _folders)
+    {
+        <MudItem xs="6" sm="4" md="3" lg="2">
+            <MudPaper Class="pa-4 d-flex flex-column align-center justify-center folder-tile"
+                      Elevation="0" Style="border-radius:12px; height:120px; cursor:pointer;"
+                      @onclick="@(() => Nav.NavigateTo(folder.Href))">
+                <MudBadge Content="@folder.Count" Color="Color.Primary" Overlap="true"
+                          Visible="@(folder.Count > 0)">
+                    <MudIcon Icon="@folder.Icon" Size="Size.Large" Color="Color.Primary" />
+                </MudBadge>
+                <MudText Typo="Typo.body2" Class="mt-2">@folder.Name</MudText>
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudFab Color="Color.Primary" StartIcon="@Icons.Material.Filled.Edit" Label="Neue E-Mail"
+        Style="position:fixed; bottom:32px; right:32px;" Href="/verfassen" />
+
+
+@code {
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+
+    private record Stat(string Label, string Value);
+    private record Folder(string Name, string Icon, string Href, int Count);
+
+    private readonly List<Stat> _stats = new()
+    {
+        new("Ungelesen", "12"),
+        new("Heute erhalten", "27"),
+        new("Entwürfe", "3"),
+        new("Speicher genutzt", "68%"),
+    };
+
+    private readonly List<Folder> _folders = new()
+    {
+        new("Posteingang",   Icons.Material.Filled.Inbox,          "/posteingang", 12),
+        new("Markiert",      Icons.Material.Filled.Star,           "/markiert", 0),
+        new("Gesendet",      Icons.Material.Filled.Send,           "/gesendet", 0),
+        new("Entwürfe",      Icons.Material.Filled.Drafts,         "/entwuerfe", 3),
+        new("Archiv",        Icons.Material.Filled.Archive,        "/archiv", 0),
+        new("Spam",          Icons.Material.Filled.Report,         "/spam", 1),
+        new("Papierkorb",    Icons.Material.Filled.Delete,         "/papierkorb", 0),
+        new("Kontakte",      Icons.Material.Filled.Contacts,       "/kontakte", 0),
+        new("Kalender",      Icons.Material.Filled.CalendarMonth,  "/kalender", 0),
+        new("Einstellungen", Icons.Material.Filled.Settings,       "/einstellungen", 0),
+    };
+}

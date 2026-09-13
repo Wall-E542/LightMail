@@ -1,0 +1,176 @@
+## .NET / MAUI .gitignore
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# MAUI / Xamarin platform build output
+*.apk
+*.aab
+*.ipa
+*.app
+*.dSYM/
+*.dSYM.zip
+*.appx
+*.appxbundle
+*.appxupload
+*.msix
+*.msixbundle
+*.msixupload
+
+# MAUI generated resources / resizetizer cache
+Resources/Images/**/*.g.cs
+Resources/AppIcon/**/*.g.cs
+**/obj/**/Resizetizer/
+
+# Visual Studio / Rider cache & user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+
+# Rider specific
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/httpRequests/
+
+# Build cache / MSBuild
+BenchmarkDotNet.Artifacts/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.assets.json
+nuget.config.local
+.nuget/
+
+# Rider / ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Secrets / local config (never commit these)
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+*.pfx
+*.p12
+*.mobileprovision
+*.cer
+
+# Android specific
+*.androidproj.user
+bin/Debug/
+bin/Release/
+obj/Debug/
+obj/Release/
+local.properties
+*.keystore
+!debug.keystore
+
+# iOS / macOS specific
+*.hmap
+*.xcuserstate
+DerivedData/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Windows / MSIX packaging
+AppPackages/
+BundleArtifacts/
+Package.StoreAssociation.xml
+_pkginfo.txt
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+coverage*.json
+coverage*.xml
+coverage*.info
+*.trx
+*.coverage
+*.coveragexml
+
+# ClickOnce
+publish/
+*.publishsettings
+
+# JetBrains Rider generated
+*.sln.iml

@@ -1,0 +1,339 @@
+﻿@page "/mail/{Folder}/{Id}"
+@using MailKit
+@using MailService = LightMail.Services.MailService
+
+<MudPaper Class="pa-6 rounded-xl">
+    @if (_mail == null)
+    {
+        <MudProgressCircular Indeterminate="true"/>
+    }
+    else
+    {
+        <MudStack Spacing="3">
+
+
+            <!-- Toolbar -->
+
+            <MudStack Row="true">
+
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                               Href="/posteingang"/>
+
+
+                <MudButton StartIcon="@Icons.Material.Filled.Reply"
+                           Href="@($"/compose/{Folder}/reply/{Id}")">
+
+                    Antworten
+
+                </MudButton>
+
+
+                <MudButton StartIcon="@Icons.Material.Filled.ReplyAll"
+                           Href="@($"/compose/{Folder}/replyall/{Id}")">
+
+                    Allen antworten
+
+                </MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Forward"
+                           Href="@($"/compose/{Folder}/forward/{Id}")">
+
+                    Weiterleiten
+
+                </MudButton>
+                <MudSpacer/>
+                <MudIconButton Icon="@(IsFlagged 
+                                         ? Icons.Material.Filled.Star 
+                                         : Icons.Material.Outlined.StarBorder)"
+               
+                               Color="@(IsFlagged 
+                                          ? Color.Warning 
+                                          : Color.Default)"
+
+                               OnClick="ToggleFlag"/>
+                <!-- Löschen -->
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               OnClick="@DeleteMail"/>
+                @if (Folder == "Archive")
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Unarchive"
+                                   Color="Color.Primary"
+                                   OnClick="MoveToInbox"/>
+                }
+                else
+                {
+                    if (MailService.ArchiveFolder != null)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Archive"
+                                       Color="Color.Primary"
+                                       OnClick="ArchiveMail"/>
+                    }
+                }
+                <MudIconButton Icon="@Icons.Material.Filled.MoreVert"/>
+            </MudStack>
+            <MudDivider/>
+            <!-- Betreff -->
+
+            <MudText Typo="Typo.h4">
+                @_mail.Subject
+            </MudText>
+            
+            <!-- Header -->
+            <MudPaper Class="pa-4"
+                      Elevation="0"
+                      Style="background:#222">
+
+
+                <MudText>
+                    <b>Von:</b>
+                    @_mail.Sender
+                </MudText>
+
+
+                <MudText>
+                    <b>Datum:</b>
+                    @_mail.Date
+                </MudText>
+                <MudText>
+                    <b>An:</b>
+                    @string.Join(", ", _mail.Recipients)
+                </MudText>
+            </MudPaper>
+
+            
+            <!-- Inhalt -->
+
+            @if (_mail.IsHtml)
+            {
+                <MudPaper Class="mail-container"
+                          Elevation="0">
+
+                    @((MarkupString)_mail.Body)
+
+                </MudPaper>
+            }
+            else
+            {
+                <MudText Style="white-space:pre-wrap">
+
+                    @_mail.Body
+
+                </MudText>
+            }
+
+            <!-- Anhänge -->
+
+            @if (_mail.Attachments.Any())
+            {
+                <MudDivider Class="my-4"/>
+
+
+                <MudText Typo="Typo.h6">
+
+                    <MudIcon Icon="@Icons.Material.Filled.AttachFile"/>
+
+                    Anhänge (@_mail.Attachments.Count)
+
+                </MudText>
+
+
+                <MudGrid Class="mt-2">
+
+
+                    @foreach (var attachment in _mail.Attachments)
+                    {
+                        <MudItem xs="12"
+                                 sm="6"
+                                 md="4">
+
+
+                            <MudPaper Class="pa-3"
+                                      Elevation="2">
+
+
+                                <MudStack Row="true"
+                                          AlignItems="AlignItems.Center">
+
+
+                                    <MudIcon Icon="@GetFileIcon(attachment.ContentType)"
+                                             Size="Size.Large"/>
+
+
+                                    <MudStack Spacing="0">
+
+                                        <MudText>
+                                            @attachment.FileName
+                                        </MudText>
+
+
+                                        <MudText Typo="Typo.caption">
+
+                                            @FormatSize(attachment.Size)
+
+                                        </MudText>
+
+                                    </MudStack>
+                                    <MudSpacer/>
+
+                                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                                   Color="Color.Primary"
+                                                   OnClick="@(() => DownloadAttachment(attachment))"/>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </MudStack>
+    }
+</MudPaper>
+
+<MudMessageBox @ref="_mudMessageBox" Title="Warnung" CancelText="Abbrechen">
+    <MessageContent>
+        Möchtest du die mail in den Papierkorb verschieben?
+    </MessageContent>
+    <YesButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.DeleteForever">Verschieben</MudButton>
+    </YesButton>
+</MudMessageBox>
+
+@inject MailService MailService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@code {
+
+    private async Task ArchiveMail()
+    {
+        await MailService.MoveToArchiveAsync(GetUniqueId());
+        Snackbar.Add(
+            "E-Mail wurde archiviert",
+            Severity.Success);
+        Nav.NavigateTo("/archiv");
+    }
+    
+    private async Task MoveToInbox()
+    {
+        
+        await MailService.MoveFromArchiveAsync(GetUniqueId());
+        Snackbar.Add(
+            "E-Mail wurde in den Posteingang verschoben",
+            Severity.Success);
+        Nav.NavigateTo("/posteingang");
+    }
+    
+    [Parameter] public string Id { get; set; }
+    [Parameter] public string Folder { get; set; }
+    
+    private EmailMessage? _mail = new();
+
+    private UniqueId GetUniqueId()
+    {
+        if (!uint.TryParse(Id, out var uidValue))
+            return default;
+
+        return new MailKit.UniqueId(uidValue);
+    }
+    
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        var uniqueId = GetUniqueId();
+        
+        _mail = await MailService.GetMailAsync(Folder, uniqueId);
+        
+        IsFlagged = await MailService.IsFlaggedAsync(Folder, uniqueId);
+    }
+
+    private string FormatSize(long bytes)
+    {
+        string[] sizes =
+        {
+            "B",
+            "KB",
+            "MB",
+            "GB"
+        };
+
+        double size = bytes;
+        var order = 0;
+        
+        while (size >= 1024 &&
+               order < sizes.Length - 1)
+        {
+            order++;
+
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+
+    private async Task DownloadAttachment(
+        EmailAttachment attachment)
+    {
+        var base64 = Convert.ToBase64String(attachment.Data);
+
+        await JS.InvokeVoidAsync(
+            "downloadFile",
+            attachment.FileName,
+            attachment.ContentType,
+            base64
+        );
+    }
+
+    private string GetFileIcon(string type)
+    {
+        if (type.Contains("pdf"))
+            return Icons.Material.Filled.PictureAsPdf;
+
+
+        if (type.StartsWith("image"))
+            return Icons.Material.Filled.Image;
+
+
+        if (type.Contains("zip"))
+            return Icons.Material.Filled.FolderZip;
+
+
+        return Icons.Material.Filled.InsertDriveFile;
+    }
+
+    [Inject] private IDialogService DialogService { get; set; }
+    private MudMessageBox _mudMessageBox;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    private async void DeleteMail()
+    {
+        bool? result = await _mudMessageBox.ShowAsync();
+       if (result == true)
+       {
+           
+           
+           
+           await MailService.MoveToTrashAsync(Folder, GetUniqueId());
+           Snackbar.Add(
+               "E-Mail wurde in den Papierkorb verschoben",
+               Severity.Success);
+           Nav.NavigateTo("/posteingang");
+       }
+    }
+    
+    private bool IsFlagged;
+
+    private async Task ToggleFlag()
+    {
+        IsFlagged = !IsFlagged;
+
+        await MailService.SetFlagAsync(
+            Folder,
+            GetUniqueId(),
+            IsFlagged);
+
+
+        Snackbar.Add(
+            IsFlagged 
+                ? "E-Mail markiert"
+                : "Markierung entfernt",
+            Severity.Success);
+    }
+}
