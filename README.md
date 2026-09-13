@@ -2,6 +2,8 @@
 
 LightMail is a lightweight email client built with .NET MAUI and Blazor Hybrid. It connects to your existing email accounts via IMAP and SMTP and provides a clean interface for reading, writing, and organizing your mail.
 
+Only in german for the moment!
+
 ## Features
 
 - Connect to any IMAP/SMTP email account (including Gmail)
