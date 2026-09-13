@@ -58,6 +58,7 @@ LightMail is still in early development. The following are known gaps and planne
 - Dark mode / theme customization
 - Offline support and local caching of messages
 - Message threading / conversation view
+- Languages
 
 ### Known Issues / Technical Debt
 - Some parts of the codebase are outdated and need refactoring for stability
